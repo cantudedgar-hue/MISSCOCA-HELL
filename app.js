@@ -390,7 +390,7 @@ function App() {
       "header",
       { className: "app-header" },
       h("h1", null, "COCA · PAC"),
-      h("p", { className: "subtitle" }, "avatar pixel art + pac-man con fantasmas de chiikawa")
+      h("p", { className: "subtitle" }, "Mi primer juego")
     ),
     h(
       "nav",
