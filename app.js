@@ -412,7 +412,7 @@ function App() {
       h("button", { className: "tab" + (tab === "avatar" ? " active" : ""), onClick: () => setTab("avatar") }, "🎨 Avatar")
     ),
     h("main", null, tab === "juego" ? h(PacmanGame) : h(AvatarView)),
-    h("footer", { className: "app-footer" }, "hecho con React · listo para GitHub Pages")
+    h("footer", { className: "app-footer" }, "Yupi")
   );
 }
 
