@@ -90,7 +90,7 @@ function AvatarView() {
     h(
       "p",
       { className: "avatar-caption" },
-      "Retrato pixel art estilizado — audífonos, lentes, playera gris y pose selfie, hecho a mano con bloques de pixel art (no es una reproducción fotográfica)."
+      "Retrato pixel art 1"
     )
   );
 }
