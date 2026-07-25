@@ -1,11 +1,7 @@
 const h = React.createElement;
 const { useState, useEffect, useRef, useCallback } = React;
 
-// ============================================================
-// MAZE
-// # pared · . coca (comida) · o coca grande (power pellet)
-// espacio = camino libre sin comida (casa de fantasmas)
-// ============================================================
+
 const MAZE_ROWS = [
   "###############",
   "#......#......#",
@@ -98,7 +94,7 @@ function AvatarView() {
 function PacmanGame() {
   const canvasRef = useRef(null);
   const stateRef = useRef(null);
-  const [ui, setUi] = useState({ score: 0, lives: 3, status: "ready" }); // ready | playing | won | lost
+  const [ui, setUi] = useState({ score: 0, lives: 3, status: "ready" }); 
 
   const initGame = useCallback(() => {
     const { grid, dotsLeft } = parseMaze();
@@ -127,7 +123,7 @@ function PacmanGame() {
     initGame();
   }, [initGame]);
 
-  // --- controles de teclado ---
+
   useEffect(() => {
     const onKey = (e) => {
       const map = {
@@ -150,14 +146,12 @@ function PacmanGame() {
     if (stateRef.current) stateRef.current.player.want = dir;
   };
 
-  // --- loop de movimiento (grid-based, con tick fijo) ---
   useEffect(() => {
     const tick = () => {
       const s = stateRef.current;
       if (!s || s.status !== "playing") return;
       s.mouthOpen = !s.mouthOpen;
 
-      // jugador: intenta girar hacia la dirección deseada, si no, sigue
       const p = s.player;
       const tryDir = DIRS[p.want];
       if (tryDir && isWalkable(s.grid, p.r + tryDir.dr, p.c + tryDir.dc)) {
@@ -168,11 +162,11 @@ function PacmanGame() {
         p.r += move.dr;
         p.c += move.dc;
       }
-      // wraparound horizontal
+
       if (p.c < 0) p.c = COLS - 1;
       if (p.c >= COLS) p.c = 0;
 
-      // comer
+
       const cell = s.grid[p.r][p.c];
       if (cell === "." ) {
         s.grid[p.r][p.c] = " ";
@@ -186,11 +180,9 @@ function PacmanGame() {
         s.ghosts.forEach((g) => { if (g.alive) g.frightUntil = s.frightTimer; });
       }
 
-      // fantasmas
       const frightened = Date.now() < s.frightTimer;
       s.ghosts.forEach((g) => {
         if (!g.alive) {
-          // regresar a la casa y reaparecer
           if (g.r === GHOST_START[0].r && Math.abs(g.c - GHOST_START[1].c) <= 1) {
             g.alive = true;
             g.frightUntil = 0;
@@ -217,7 +209,6 @@ function PacmanGame() {
           const isFright = Date.now() < g.frightUntil;
           let chosen;
           if (Math.random() < 0.65) {
-            // moverse hacia (o lejos, si asustado) del jugador
             let best = pool[0];
             let bestScore = -Infinity;
             for (const d of pool) {
@@ -266,7 +257,7 @@ function PacmanGame() {
     return () => clearInterval(id);
   }, []);
 
-  // --- render ---
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -280,7 +271,6 @@ function PacmanGame() {
       ctx.fillStyle = "#0c0d14";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       if (s) {
-        // paredes
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
             const cell = s.grid[r][c];
@@ -292,7 +282,6 @@ function PacmanGame() {
             }
           }
         }
-        // dibujar cocas (comida) con tamaño fijo prolijo
         const dotPx = Math.max(2, Math.floor(TILE / 8));
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
@@ -315,7 +304,6 @@ function PacmanGame() {
             }
           }
         }
-        // fantasmas
         const ghostPx = TILE / GHOST_W * 0.95;
         s.ghosts.forEach((g) => {
           if (!g.alive) return;
@@ -331,7 +319,6 @@ function PacmanGame() {
           );
           ctx.restore();
         });
-        // jugador (pac-man clásico redondo)
         const p = s.player;
         const cx = p.c * TILE + TILE / 2;
         const cy = p.r * TILE + TILE / 2;
