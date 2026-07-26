@@ -93,51 +93,26 @@ function kawaiiFace() {
   ];
 }
 
-// 1) Gato: cuerpo blanco, orejas triangulares con un moño azul
-// en la izquierda
-const CHIIKAWA = [
-  // oreja izquierda (con moño)
-  { x: 2, y: -3, w: 2, h: 1, c: "white" },
-  { x: 1, y: -2, w: 3, h: 1, c: "white" },
-  { x: 1, y: -1, w: 4, h: 1, c: "white" },
-  { x: 1, y: -1, w: 1, h: 1, c: "outline" },
-  { x: 4, y: -1, w: 1, h: 1, c: "outline" },
-  // oreja derecha
-  { x: 10, y: -3, w: 2, h: 1, c: "white" },
-  { x: 10, y: -2, w: 3, h: 1, c: "white" },
-  { x: 9, y: -1, w: 4, h: 1, c: "white" },
-  { x: 9, y: -1, w: 1, h: 1, c: "outline" },
-  { x: 12, y: -1, w: 1, h: 1, c: "outline" },
-  ...ghostBody("white"),
-  ...kawaiiFace(),
-  // moño celeste en la base de la oreja izquierda
-  { x: 0, y: -1, w: 1, h: 1, c: "blue" },
-  { x: 1, y: -2, w: 1, h: 1, c: "blueD" },
-  { x: 2, y: -1, w: 1, h: 1, c: "blue" },
-];
+// ---------- enemigos: ahora son imagenes PNG reales (el pixel art
+// que hiciste tú), no rects generados por codigo. Se cargan una sola
+// vez aqui y se dibujan con ctx.drawImage() en app.js. El navegador
+// las muestra "pixeladas" gracias a ctx.imageSmoothingEnabled=false
+// (ver draw() en app.js) y a image-rendering:pixelated en el CSS. ----------
+const ENEMY_SRC = {
+  hachiware: "assets/enemy-hachiware.png",
+  chiikawa: "assets/enemy-chiikawa.png",
+  usagi: "assets/enemy-usagi.png",
+};
+const ENEMY_IMAGES = {};
+for (const key in ENEMY_SRC) {
+  const img = new Image();
+  img.src = ENEMY_SRC[key];
+  ENEMY_IMAGES[key] = img;
+}
 
-// 2) Conejo: cuerpo amarillo pastel, orejas largas con interior rosa
-const USAGI = [
-  { x: 3, y: -7, w: 2, h: 1, c: "yellow" },
-  { x: 9, y: -7, w: 2, h: 1, c: "yellow" },
-  { x: 3, y: -6, w: 2, h: 5, c: "yellow" },
-  { x: 9, y: -6, w: 2, h: 5, c: "yellow" },
-  { x: 3, y: -5, w: 1, h: 3, c: "pink" },
-  { x: 10, y: -5, w: 1, h: 3, c: "pink" },
-  { x: 2, y: -1, w: 10, h: 1, c: "yellow" },
-  ...ghostBody("yellow"),
-  ...kawaiiFace(),
-];
-
-// 3) Oso: cuerpo blanco, orejas redondas y sencillas, sin adornos
-const HACHIWARE = [
-  { x: 1, y: -2, w: 3, h: 2, c: "white" },
-  { x: 10, y: -2, w: 3, h: 2, c: "white" },
-  { x: 2, y: -1, w: 10, h: 1, c: "white" },
-  ...ghostBody("white"),
-  ...kawaiiFace(),
-];
-
+// se conservan para el modo "asustado" (ghostBody("blueD")+eyes) y
+// los ojitos que regresan a casa, que siguen siendo pixel art por
+// codigo ya que no hay una imagen para esos estados.
 const GHOST_W = 14, GHOST_H = 10, GHOST_YOFF = 7; // reservar espacio para orejas arriba
 
 // ---------- Pac player: círculo clásico dibujado con arc(), no

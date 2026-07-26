@@ -52,9 +52,9 @@ const GHOST_START = [
   { r: 10, c: 10 },
 ];
 const GHOST_DEFS = [
-  { name: "Hachiware", sprite: HACHIWARE },
-  { name: "Chiikawa", sprite: CHIIKAWA },
-  { name: "Usagi", sprite: USAGI },
+  { name: "Hachiware", img: ENEMY_IMAGES.hachiware },
+  { name: "Chiikawa", img: ENEMY_IMAGES.chiikawa },
+  { name: "Usagi", img: ENEMY_IMAGES.usagi },
 ];
 
 function parseMaze() {
@@ -438,14 +438,30 @@ function PacmanGame() {
           }
           const isFright = Date.now() < g.frightUntil;
           ctx.save();
-          if (isFright) ctx.globalAlpha = 0.7;
-          drawSprite(
-            ctx,
-            isFright ? ghostBody("blueD").concat(eyes) : g.def.sprite,
-            vc * TILE + (TILE - GHOST_W * ghostPx) / 2,
-            vr * TILE + (TILE - GHOST_W * ghostPx) / 2 - GHOST_YOFF * ghostPx * 0.55,
-            ghostPx
-          );
+          if (isFright) {
+            // asustado: sigue siendo pixel art por codigo, no hay
+            // imagen para este estado
+            ctx.globalAlpha = 0.7;
+            drawSprite(
+              ctx,
+              ghostBody("blueD").concat(eyes),
+              vc * TILE + (TILE - GHOST_W * ghostPx) / 2,
+              vr * TILE + (TILE - GHOST_W * ghostPx) / 2 - GHOST_YOFF * ghostPx * 0.55,
+              ghostPx
+            );
+          } else if (g.def.img && g.def.img.complete && g.def.img.naturalWidth) {
+            // enemigo normal: imagen real (tu pixel art), no rects
+            const img = g.def.img;
+            const w = TILE * 1.3;
+            const hh = w * (img.naturalHeight / img.naturalWidth);
+            ctx.drawImage(
+              img,
+              vc * TILE + (TILE - w) / 2,
+              vr * TILE + (TILE - hh) / 2 - hh * 0.12,
+              w,
+              hh
+            );
+          }
           ctx.restore();
         });
         // jugador (pac-man clasico redondo)
