@@ -75,6 +75,7 @@ html, body {
 
 main { width: 100%; display: flex; justify-content: center; }
 
+/* ---- avatar ---- */
 .avatar-view {
   display: flex;
   flex-direction: column;

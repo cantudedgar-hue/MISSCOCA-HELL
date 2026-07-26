@@ -60,63 +60,87 @@ const COKE_BOTTLE = [
 ];
 const COKE_W = 7, COKE_H = 10;
 
-// ---------- forma base de fantasma (10x11), estilo redondo con
-// falda ondulada, compartida por los 3 personajes ----------
+// ---------- forma base de fantasma (14 de ancho), estilo redondo
+// con falda ondulada, compartida por los 3 personajes ----------
 function ghostBody(bodyColor) {
   return [
-    { x: 3, y: 0, w: 4, h: 1, c: bodyColor },
-    { x: 2, y: 1, w: 6, h: 1, c: bodyColor },
-    { x: 1, y: 2, w: 8, h: 6, c: bodyColor },
-    { x: 0, y: 3, w: 10, h: 5, c: bodyColor },
+    { x: 5, y: 0, w: 4, h: 1, c: bodyColor },
+    { x: 3, y: 1, w: 8, h: 1, c: bodyColor },
+    { x: 2, y: 2, w: 10, h: 1, c: bodyColor },
+    { x: 1, y: 3, w: 12, h: 1, c: bodyColor },
+    { x: 0, y: 4, w: 14, h: 5, c: bodyColor },
     { x: 0, y: 9, w: 2, h: 1, c: bodyColor },
     { x: 3, y: 9, w: 2, h: 1, c: bodyColor },
     { x: 6, y: 9, w: 2, h: 1, c: bodyColor },
-    { x: 8, y: 9, w: 2, h: 1, c: bodyColor },
-    { x: 0, y: 10, w: 2, h: 1, c: bodyColor },
-    { x: 6, y: 10, w: 2, h: 1, c: bodyColor },
+    { x: 9, y: 9, w: 2, h: 1, c: bodyColor },
+    { x: 12, y: 9, w: 2, h: 1, c: bodyColor },
   ];
 }
 const eyes = [
-  { x: 2, y: 4, w: 2, h: 3, c: "white" },
-  { x: 6, y: 4, w: 2, h: 3, c: "white" },
-  { x: 3, y: 5, w: 1, h: 1, c: "ink" },
-  { x: 7, y: 5, w: 1, h: 1, c: "ink" },
+  { x: 3, y: 5, w: 3, h: 4, c: "white" },
+  { x: 8, y: 5, w: 3, h: 4, c: "white" },
+  { x: 4, y: 7, w: 1, h: 2, c: "ink" },
+  { x: 9, y: 7, w: 1, h: 2, c: "ink" },
 ];
+const cheeks = [
+  { x: 0, y: 8, w: 2, h: 1, c: "pink" },
+  { x: 12, y: 8, w: 2, h: 1, c: "pink" },
+];
+const mouth = [{ x: 6, y: 8, w: 2, h: 1, c: "outline" }];
 
-// Chiikawa: blanco, orejitas negras redondas, mejillas rosas
+// Chiikawa: blanco, orejitas pequeñas y redondas, mejillas rosas
 const CHIIKAWA = [
-  { x: 3, y: -1, w: 1, h: 1, c: "black" },
-  { x: 6, y: -1, w: 1, h: 1, c: "black" },
+  { x: 2, y: -2, w: 2, h: 1, c: "white" },
+  { x: 10, y: -2, w: 2, h: 1, c: "white" },
+  { x: 1, y: -1, w: 4, h: 1, c: "white" },
+  { x: 9, y: -1, w: 4, h: 1, c: "white" },
+  { x: 1, y: -1, w: 1, h: 1, c: "outline" },
+  { x: 12, y: -1, w: 1, h: 1, c: "outline" },
   ...ghostBody("white"),
-  { x: 1, y: 6, w: 1, h: 1, c: "pink" },
-  { x: 8, y: 6, w: 1, h: 1, c: "pink" },
+  ...cheeks,
   ...eyes,
+  ...mouth,
 ];
 
 // Usagi: crema, orejas largas de conejo con interior rosa, mejillas
 const USAGI = [
-  { x: 2, y: -4, w: 2, h: 5, c: "cream" },
-  { x: 6, y: -4, w: 2, h: 5, c: "cream" },
-  { x: 2, y: -3, w: 1, h: 3, c: "pink" },
-  { x: 7, y: -3, w: 1, h: 3, c: "pink" },
+  { x: 3, y: -7, w: 2, h: 1, c: "cream" },
+  { x: 9, y: -7, w: 2, h: 1, c: "cream" },
+  { x: 3, y: -6, w: 2, h: 5, c: "cream" },
+  { x: 9, y: -6, w: 2, h: 5, c: "cream" },
+  { x: 3, y: -5, w: 1, h: 3, c: "pink" },
+  { x: 10, y: -5, w: 1, h: 3, c: "pink" },
+  { x: 2, y: -1, w: 10, h: 1, c: "cream" },
   ...ghostBody("cream"),
-  { x: 1, y: 6, w: 1, h: 1, c: "pink" },
-  { x: 8, y: 6, w: 1, h: 1, c: "pink" },
+  ...cheeks,
   ...eyes,
+  ...mouth,
 ];
 
-// Hachiware: blanco con parche celeste partido a un lado ("hachiware"
-// = pelaje partido en dos colores), orejas triangulares bicolor
+// Hachiware: blanco con orejas/corona celeste de doble pico y una
+// mancha celeste asimétrica (el "split" que le da su nombre)
 const HACHIWARE = [
-  { x: 2, y: -1, w: 2, h: 1, c: "blueD" },
-  { x: 6, y: -1, w: 2, h: 1, c: "white" },
+  { x: 6, y: -6, w: 1, h: 1, c: "blueD" },
+  { x: 3, y: -5, w: 2, h: 1, c: "blue" },
+  { x: 9, y: -5, w: 2, h: 1, c: "blue" },
+  { x: 2, y: -4, w: 3, h: 1, c: "blue" },
+  { x: 9, y: -4, w: 3, h: 1, c: "blue" },
+  { x: 2, y: -3, w: 4, h: 1, c: "blue" },
+  { x: 8, y: -3, w: 4, h: 1, c: "blue" },
+  { x: 1, y: -2, w: 5, h: 1, c: "blue" },
+  { x: 8, y: -2, w: 5, h: 1, c: "blue" },
+  { x: 3, y: -2, w: 2, h: 1, c: "blueD" },
+  { x: 9, y: -2, w: 2, h: 1, c: "blueD" },
+  { x: 1, y: -1, w: 12, h: 1, c: "blue" },
+  { x: 5, y: -1, w: 4, h: 1, c: "blueD" },
   ...ghostBody("white"),
-  { x: 5, y: 2, w: 4, h: 6, c: "blue" },
-  { x: 6, y: 3, w: 1, h: 4, c: "blueD" },
+  { x: 9, y: 9, w: 2, h: 1, c: "blue" }, // mancha asimétrica característica
+  ...cheeks,
   ...eyes,
+  ...mouth,
 ];
 
-const GHOST_W = 10, GHOST_H = 11, GHOST_YOFF = 4; // reservar espacio para orejas arriba
+const GHOST_W = 14, GHOST_H = 10, GHOST_YOFF = 7; // reservar espacio para orejas arriba
 
 // ---------- Pac player: círculo clásico dibujado con arc(), no
 // grid — se ve mejor redondo contra el resto del pixel art ----------

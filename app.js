@@ -1,33 +1,55 @@
 const h = React.createElement;
 const { useState, useEffect, useRef, useCallback } = React;
 
-
-const MAZE_ROWS = [
-  "###############",
-  "#......#......#",
-  "#.####.#.####.#",
-  "#o####.#.####o#",
-  "#.............#",
-  "#.###.#.#.###.#",
-  "#.....#.#.....#",
-  "#....##.##....#",
-  "#....     ....#",
-  "#....##.##....#",
-  "#.....#.#.....#",
-  "#.###.#.#.###.#",
-  "#.............#",
-  "#o####.#.####o#",
-  "#.####.#.####.#",
-  "#......#......#",
-  "###############",
+// ============================================================
+// MAZE — 19x21, generado y validado con espejado simetrico
+// (horizontal y vertical) para una mejor distribucion del mapa.
+// # pared . coca (comida) o pastilla de poder (punto blanco)
+// espacio = camino libre sin comida (casa de fantasmas)
+// ============================================================
+const RAW_MAZE = [
+  "###################",
+  "#.................#",
+  "#.##.##.###.##.##.#",
+  "#.#.....###.....#.#",
+  "#.#.##.#####.##.#.#",
+  "#.................#",
+  "#.###.#######.###.#",
+  "#...#.#######.#...#",
+  "#.#.#..     ..#.#.#",
+  "#.#.#####.#####.#.#",
+  "#.####.     .####.#",
+  "#.#.#####.#####.#.#",
+  "#.#.#..     ..#.#.#",
+  "#...#.#######.#...#",
+  "#.###.#######.###.#",
+  "#.................#",
+  "#.#.##.#####.##.#.#",
+  "#.#.....###.....#.#",
+  "#.##.##.###.##.##.#",
+  "#.................#",
+  "###################",
 ];
+// pastillas de poder en las 4 esquinas del recorrido exterior
+const POWER_SPOTS = [
+  [1, 1], [1, 17], [19, 1], [19, 17],
+];
+const MAZE_ROWS = RAW_MAZE.map((row, r) => {
+  const spots = POWER_SPOTS.filter(([pr]) => pr === r).map(([, pc]) => pc);
+  if (!spots.length) return row;
+  const chars = row.split("");
+  spots.forEach((c) => { chars[c] = "o"; });
+  return chars.join("");
+});
+
 const ROWS = MAZE_ROWS.length;
 const COLS = MAZE_ROWS[0].length;
-const PLAYER_START = { r: 12, c: 7 };
+const PLAYER_START = { r: 15, c: 9 };
+const GHOST_HOME = { r: 10, c: 9 };
 const GHOST_START = [
-  { r: 8, c: 6 },
-  { r: 8, c: 7 },
-  { r: 8, c: 8 },
+  { r: 10, c: 8 },
+  { r: 10, c: 9 },
+  { r: 10, c: 10 },
 ];
 const GHOST_DEFS = [
   { name: "Hachiware", sprite: HACHIWARE },
@@ -51,7 +73,9 @@ function parseMaze() {
 }
 
 function isWalkable(grid, r, c) {
-  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return false;
+  if (r < 0 || r >= ROWS) return false;
+  if (c < 0) c = COLS - 1;
+  if (c >= COLS) c = 0;
   return grid[r][c] !== "#";
 }
 
@@ -62,9 +86,13 @@ const DIRS = {
   right: { dr: 0, dc: 1 },
 };
 const OPPOSITE = { up: "down", down: "up", left: "right", right: "left" };
+const DIR_KEYS = Object.keys(DIRS);
 
-const TILE = 26;
-const STEP_MS = 165;
+const TILE = 22;
+const SPEED_PLAYER = 5.3;      // celdas por segundo
+const SPEED_GHOST = 4.4;
+const SPEED_GHOST_FRIGHT = 2.7;
+const SPEED_GHOST_EATEN = 7.5;
 const FRIGHT_MS = 7000;
 
 function AvatarView() {
@@ -86,15 +114,34 @@ function AvatarView() {
     h(
       "p",
       { className: "avatar-caption" },
-      "Retrato pixel art 1"
+      "Retrato pixel art estilizado — audifonos, lentes, playera gris y pose selfie, hecho a mano con bloques de pixel art (no es una reproduccion fotografica)."
     )
   );
+}
+
+function wrapCol(c) {
+  if (c < 0) return COLS - 1;
+  if (c >= COLS) return 0;
+  return c;
+}
+
+function pickChase(pool, from, target, away) {
+  let best = pool[0];
+  let bestScore = -Infinity;
+  for (const d of pool) {
+    const m = DIRS[d];
+    const nr = from.r + m.dr, nc = wrapCol(from.c + m.dc);
+    let dist = Math.abs(nr - target.r) + Math.abs(nc - target.c);
+    const score = away ? dist : -dist;
+    if (score > bestScore) { bestScore = score; best = d; }
+  }
+  return best;
 }
 
 function PacmanGame() {
   const canvasRef = useRef(null);
   const stateRef = useRef(null);
-  const [ui, setUi] = useState({ score: 0, lives: 3, status: "ready" }); 
+  const [ui, setUi] = useState({ score: 0, lives: 3, status: "ready" }); // ready | playing | won | lost
 
   const initGame = useCallback(() => {
     const { grid, dotsLeft } = parseMaze();
@@ -103,27 +150,22 @@ function PacmanGame() {
       dotsLeft,
       score: 0,
       lives: 3,
-      player: { r: PLAYER_START.r, c: PLAYER_START.c, dir: "left", want: "left" },
+      player: { r: PLAYER_START.r, c: PLAYER_START.c, dir: null, facing: "left", want: "left", progress: 0 },
       ghosts: GHOST_START.map((g, i) => ({
-        r: g.r,
-        c: g.c,
-        dir: "up",
-        def: GHOST_DEFS[i],
-        alive: true,
-        frightUntil: 0,
+        r: g.r, c: g.c, dir: null, facing: "up", progress: 0,
+        def: GHOST_DEFS[i], alive: true, frightUntil: 0,
       })),
       frightTimer: 0,
       status: "playing",
       mouthOpen: true,
+      mouthT: 0,
     };
     setUi({ score: 0, lives: 3, status: "playing" });
   }, []);
 
-  useEffect(() => {
-    initGame();
-  }, [initGame]);
+  useEffect(() => { initGame(); }, [initGame]);
 
-
+  // --- controles de teclado ---
   useEffect(() => {
     const onKey = (e) => {
       const map = {
@@ -146,118 +188,146 @@ function PacmanGame() {
     if (stateRef.current) stateRef.current.player.want = dir;
   };
 
-  useEffect(() => {
-    const tick = () => {
-      const s = stateRef.current;
-      if (!s || s.status !== "playing") return;
-      s.mouthOpen = !s.mouthOpen;
+  const eatAt = (s, r, c) => {
+    const cell = s.grid[r][c];
+    if (cell === ".") {
+      s.grid[r][c] = " ";
+      s.score += 10;
+      s.dotsLeft--;
+    } else if (cell === "o") {
+      s.grid[r][c] = " ";
+      s.score += 50;
+      s.dotsLeft--;
+      s.frightTimer = Date.now() + FRIGHT_MS;
+      s.ghosts.forEach((g) => { if (g.alive) g.frightUntil = s.frightTimer; });
+    }
+    if (s.dotsLeft <= 0) s.status = "won";
+  };
 
-      const p = s.player;
-      const tryDir = DIRS[p.want];
-      if (tryDir && isWalkable(s.grid, p.r + tryDir.dr, p.c + tryDir.dc)) {
-        p.dir = p.want;
-      }
-      const move = DIRS[p.dir];
-      if (move && isWalkable(s.grid, p.r + move.dr, p.c + move.dc)) {
-        p.r += move.dr;
-        p.c += move.dc;
-      }
-
-      if (p.c < 0) p.c = COLS - 1;
-      if (p.c >= COLS) p.c = 0;
-
-
-      const cell = s.grid[p.r][p.c];
-      if (cell === "." ) {
-        s.grid[p.r][p.c] = " ";
-        s.score += 10;
-        s.dotsLeft--;
-      } else if (cell === "o") {
-        s.grid[p.r][p.c] = " ";
-        s.score += 50;
-        s.dotsLeft--;
-        s.frightTimer = Date.now() + FRIGHT_MS;
-        s.ghosts.forEach((g) => { if (g.alive) g.frightUntil = s.frightTimer; });
-      }
-
-      const frightened = Date.now() < s.frightTimer;
-      s.ghosts.forEach((g) => {
-        if (!g.alive) {
-          if (g.r === GHOST_START[0].r && Math.abs(g.c - GHOST_START[1].c) <= 1) {
-            g.alive = true;
-            g.frightUntil = 0;
-            return;
+  const resolveCollisions = (s) => {
+    const p = s.player;
+    for (const g of s.ghosts) {
+      if (!g.alive) continue;
+      const dr = g.r - p.r, dc = g.c - p.c;
+      if (Math.abs(dr) + Math.abs(dc) > 1) continue; // filtro rapido
+      const dist = Math.hypot(dr, dc);
+      if (dist < 0.6) {
+        const isFright = Date.now() < g.frightUntil;
+        if (isFright) {
+          g.alive = false;
+          g.frightUntil = 0;
+          s.score += 200;
+        } else {
+          s.lives -= 1;
+          if (s.lives <= 0) {
+            s.status = "lost";
+          } else {
+            p.r = PLAYER_START.r; p.c = PLAYER_START.c; p.dir = null; p.facing = "left"; p.want = "left"; p.progress = 0;
+            s.ghosts.forEach((gg, i) => {
+              gg.r = GHOST_START[i].r; gg.c = GHOST_START[i].c;
+              gg.dir = null; gg.progress = 0; gg.alive = true; gg.frightUntil = 0;
+            });
           }
-          const target = GHOST_START[1];
-          const dr = Math.sign(target.r - g.r);
-          const dc = Math.sign(target.c - g.c);
-          if (dr !== 0 && isWalkable(s.grid, g.r + dr, g.c)) g.r += dr;
-          else if (dc !== 0 && isWalkable(s.grid, g.r, g.c + dc)) g.c += dc;
           return;
         }
-        const options = Object.keys(DIRS).filter((d) => {
-          const m = DIRS[d];
-          return (
-            isWalkable(s.grid, g.r + m.dr, g.c + m.dc) &&
-            d !== OPPOSITE[g.dir]
-          );
-        });
-        const pool = options.length ? options : Object.keys(DIRS).filter((d) =>
-          isWalkable(s.grid, g.r + DIRS[d].dr, g.c + DIRS[d].dc)
-        );
-        if (pool.length) {
-          const isFright = Date.now() < g.frightUntil;
-          let chosen;
-          if (Math.random() < 0.65) {
-            let best = pool[0];
-            let bestScore = -Infinity;
-            for (const d of pool) {
-              const m = DIRS[d];
-              const nr = g.r + m.dr, nc = g.c + m.dc;
-              let dist = Math.abs(nr - p.r) + Math.abs(nc - p.c);
-              if (isFright) dist = -dist;
-              const score = -dist;
-              if (score > bestScore) { bestScore = score; best = d; }
-            }
-            chosen = best;
-          } else {
-            chosen = pool[Math.floor(Math.random() * pool.length)];
-          }
-          g.dir = chosen;
-          g.r += DIRS[chosen].dr;
-          g.c += DIRS[chosen].dc;
-        }
-        if (g.c < 0) g.c = COLS - 1;
-        if (g.c >= COLS) g.c = 0;
-      });
+      }
+    }
+  };
 
-      // colisiones
-      for (const g of s.ghosts) {
-        if (g.r === p.r && g.c === p.c) {
-          const isFright = Date.now() < g.frightUntil && g.alive;
-          if (isFright) {
-            g.alive = false;
-            s.score += 200;
-          } else if (g.alive) {
-            s.lives -= 1;
-            if (s.lives <= 0) {
-              s.status = "lost";
-            } else {
-              p.r = PLAYER_START.r; p.c = PLAYER_START.c; p.dir = "left"; p.want = "left";
-              s.ghosts.forEach((gg, i) => { gg.r = GHOST_START[i].r; gg.c = GHOST_START[i].c; gg.alive = true; gg.frightUntil = 0; });
-            }
-          }
+  // decide la proxima direccion de un fantasma parado exactamente sobre una celda
+  const decideGhostDir = (s, g) => {
+    if (!g.alive) {
+      const pool = DIR_KEYS.filter((d) => isWalkable(s.grid, g.r + DIRS[d].dr, wrapCol(g.c + DIRS[d].dc)));
+      if (!pool.length) return null;
+      if (g.r === GHOST_HOME.r && g.c === GHOST_HOME.c) {
+        g.alive = true;
+        g.frightUntil = 0;
+      }
+      return pickChase(pool, g, GHOST_HOME, false);
+    }
+    const noReverse = DIR_KEYS.filter((d) =>
+      d !== OPPOSITE[g.facing] && isWalkable(s.grid, g.r + DIRS[d].dr, wrapCol(g.c + DIRS[d].dc))
+    );
+    const pool = noReverse.length ? noReverse : DIR_KEYS.filter((d) =>
+      isWalkable(s.grid, g.r + DIRS[d].dr, wrapCol(g.c + DIRS[d].dc))
+    );
+    if (!pool.length) return null;
+    const isFright = Date.now() < g.frightUntil;
+    if (Math.random() < 0.65) {
+      return pickChase(pool, g, s.player, isFright);
+    }
+    return pool[Math.floor(Math.random() * pool.length)];
+  };
+
+  const decidePlayerDir = (s, p) => {
+    if (p.want && isWalkable(s.grid, p.r + DIRS[p.want].dr, wrapCol(p.c + DIRS[p.want].dc))) return p.want;
+    if (p.facing && isWalkable(s.grid, p.r + DIRS[p.facing].dr, wrapCol(p.c + DIRS[p.facing].dc))) return p.facing;
+    return null;
+  };
+
+  // avanza una entidad basada en tiles con interpolacion continua (movimiento fluido)
+  const stepEntity = (s, e, speed, dt, decideDir, onArrive) => {
+    if (e.dir) {
+      e.progress += speed * dt;
+      let guard = 0;
+      while (e.progress >= 1 && guard++ < 4) {
+        e.progress -= 1;
+        e.r += DIRS[e.dir].dr;
+        e.c = wrapCol(e.c + DIRS[e.dir].dc);
+        if (onArrive) onArrive(e);
+        const next = decideDir(s, e);
+        if (next && isWalkable(s.grid, e.r + DIRS[next].dr, wrapCol(e.c + DIRS[next].dc))) {
+          e.dir = next;
+          e.facing = next;
+        } else {
+          e.dir = null;
+          e.progress = 0;
+          break;
         }
       }
-      if (s.dotsLeft <= 0) s.status = "won";
+    } else {
+      const next = decideDir(s, e);
+      if (next && isWalkable(s.grid, e.r + DIRS[next].dr, wrapCol(e.c + DIRS[next].dc))) {
+        e.dir = next;
+        e.facing = next;
+      }
+    }
+  };
 
-      setUi({ score: s.score, lives: s.lives, status: s.status });
+  // --- loop principal (requestAnimationFrame, movimiento continuo) ---
+  useEffect(() => {
+    let raf;
+    let last = performance.now();
+    let uiAccum = 0;
+    const loop = (now) => {
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      const s = stateRef.current;
+      if (s && s.status === "playing") {
+        s.mouthT += dt;
+        s.mouthOpen = Math.floor(s.mouthT * 9) % 2 === 0;
+
+        stepEntity(s, s.player, SPEED_PLAYER, dt, decidePlayerDir, (p) => eatAt(s, p.r, p.c));
+        s.ghosts.forEach((g) => {
+          const isFright = g.alive && Date.now() < g.frightUntil;
+          const speed = !g.alive ? SPEED_GHOST_EATEN : isFright ? SPEED_GHOST_FRIGHT : SPEED_GHOST;
+          stepEntity(s, g, speed, dt, decideGhostDir, null);
+        });
+        resolveCollisions(s);
+
+        uiAccum += dt;
+        if (uiAccum > 0.12) {
+          uiAccum = 0;
+          setUi({ score: s.score, lives: s.lives, status: s.status });
+        }
+      }
+      raf = requestAnimationFrame(loop);
     };
-    const id = setInterval(tick, STEP_MS);
-    return () => clearInterval(id);
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
-
+  // --- render ---
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -265,16 +335,21 @@ function PacmanGame() {
     canvas.width = COLS * TILE;
     canvas.height = ROWS * TILE;
     let raf;
+    const visPos = (e) => {
+      if (!e.dir) return { vr: e.r, vc: e.c };
+      const m = DIRS[e.dir];
+      return { vr: e.r + m.dr * e.progress, vc: e.c + m.dc * e.progress };
+    };
     const draw = () => {
       const s = stateRef.current;
       ctx.imageSmoothingEnabled = false;
       ctx.fillStyle = "#0c0d14";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       if (s) {
+        // paredes
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
-            const cell = s.grid[r][c];
-            if (cell === "#") {
+            if (s.grid[r][c] === "#") {
               ctx.fillStyle = "#1c3fae";
               ctx.fillRect(c * TILE + 2, r * TILE + 2, TILE - 4, TILE - 4);
               ctx.fillStyle = "#3a63e8";
@@ -282,7 +357,9 @@ function PacmanGame() {
             }
           }
         }
+        // comida: cocas pequenas; pastillas de poder: solo un punto blanco
         const dotPx = Math.max(2, Math.floor(TILE / 8));
+        const pulse = 0.75 + 0.25 * Math.sin(Date.now() / 180);
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
             const cell = s.grid[r][c];
@@ -294,39 +371,40 @@ function PacmanGame() {
                 dotPx
               );
             } else if (cell === "o") {
-              const bigPx = dotPx * 1.7;
-              drawSprite(
-                ctx, COKE_BOTTLE,
-                c * TILE + (TILE - COKE_W * bigPx) / 2,
-                r * TILE + (TILE - COKE_H * bigPx) / 2,
-                bigPx
-              );
+              ctx.fillStyle = "#ffffff";
+              ctx.globalAlpha = pulse;
+              ctx.beginPath();
+              ctx.arc(c * TILE + TILE / 2, r * TILE + TILE / 2, TILE * 0.22, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.globalAlpha = 1;
             }
           }
         }
-        const ghostPx = TILE / GHOST_W * 0.95;
+        // fantasmas
+        const ghostPx = (TILE / GHOST_W) * 1.05;
         s.ghosts.forEach((g) => {
           if (!g.alive) return;
+          const { vr, vc } = visPos(g);
           const isFright = Date.now() < g.frightUntil;
           ctx.save();
-          if (isFright) ctx.globalAlpha = 0.65;
+          if (isFright) ctx.globalAlpha = 0.7;
           drawSprite(
             ctx,
             isFright ? ghostBody("blueD").concat(eyes) : g.def.sprite,
-            g.c * TILE + (TILE - GHOST_W * ghostPx) / 2,
-            g.r * TILE + (TILE - GHOST_W * ghostPx) / 2 - GHOST_YOFF * ghostPx * 0.4,
+            vc * TILE + (TILE - GHOST_W * ghostPx) / 2,
+            vr * TILE + (TILE - GHOST_W * ghostPx) / 2 - GHOST_YOFF * ghostPx * 0.55,
             ghostPx
           );
           ctx.restore();
         });
+        // jugador (pac-man clasico redondo)
         const p = s.player;
-        const cx = p.c * TILE + TILE / 2;
-        const cy = p.r * TILE + TILE / 2;
+        const { vr, vc } = visPos(p);
+        const cx = vc * TILE + TILE / 2;
+        const cy = vr * TILE + TILE / 2;
         const rad = TILE * 0.42;
-        const angles = {
-          right: 0, down: 90, left: 180, up: 270,
-        };
-        const baseAngle = (angles[p.dir] || 0) * Math.PI / 180;
+        const angles = { right: 0, down: 90, left: 180, up: 270 };
+        const baseAngle = (angles[p.facing] || 0) * Math.PI / 180;
         const mouth = s.mouthOpen ? 0.24 : 0.02;
         ctx.fillStyle = "#ffd23f";
         ctx.beginPath();
@@ -377,7 +455,7 @@ function PacmanGame() {
         h("button", { className: "tc-btn", onClick: () => setWant("right") }, "▶")
       )
     ),
-    h("p", { className: "hint" }, "Usa las flechas / WASD o los botones. Come todas las cocas evitando a Hachiware, Chiikawa y Usagi — o cómetelos tú cuando tomes una coca grande.")
+    h("p", { className: "hint" }, "Usa las flechas / WASD o los botones. Come todas las cocas evitando a Hachiware, Chiikawa y Usagi — el punto blanco grande los vuelve vulnerables por unos segundos para que tú te los comas.")
   );
 }
 
@@ -390,7 +468,7 @@ function App() {
       "header",
       { className: "app-header" },
       h("h1", null, "COCA · PAC"),
-      h("p", { className: "subtitle" }, "Mi primer juego")
+      h("p", { className: "subtitle" }, "avatar pixel art + pac-man con fantasmas de chiikawa")
     ),
     h(
       "nav",
@@ -399,7 +477,7 @@ function App() {
       h("button", { className: "tab" + (tab === "avatar" ? " active" : ""), onClick: () => setTab("avatar") }, "🎨 Avatar")
     ),
     h("main", null, tab === "juego" ? h(PacmanGame) : h(AvatarView)),
-    h("footer", { className: "app-footer" }, "Yupi")
+    h("footer", { className: "app-footer" }, "hecho con React · listo para GitHub Pages")
   );
 }
 
