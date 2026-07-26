@@ -20,7 +20,7 @@ html, body {
 }
 
 .app {
-  max-width: 620px;
+  max-width: 700px;
   margin: 0 auto;
   padding: 24px 16px 48px;
   display: flex;
@@ -132,7 +132,7 @@ main { width: 100%; display: flex; justify-content: center; }
 .game-canvas {
   image-rendering: pixelated;
   display: block;
-  width: min(90vw, 390px);
+  width: min(96vw, 640px);
   height: auto;
 }
 

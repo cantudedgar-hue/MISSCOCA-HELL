@@ -31,6 +31,8 @@ const PALETTE = {
   shirtD:  "#6d7176",
   phone:   "#2a2d33",
   lens:    "#dfeaf0",
+  yellow:  "#f5dd8c",
+  yellowD: "#e0c268",
 };
 
 function mirror(rects, totalWidth) {
@@ -39,23 +41,14 @@ function mirror(rects, totalWidth) {
 }
 
 // ---------- botella de coca (comida) ----------
-// grid 7x10
+// grid 7x10 — silueta simple y sin ahusar, para que se lea bien
+// incluso a tamaño chico (nada de cono, solo tapa + cuerpo + franja)
 const COKE_BOTTLE = [
-  { x: 3, y: 0, w: 1, h: 1, c: "red" },
-  { x: 2, y: 1, w: 3, h: 1, c: "red" },
-  { x: 2, y: 2, w: 1, h: 1, c: "outline" },
-  { x: 4, y: 2, w: 1, h: 1, c: "outline" },
-  { x: 2, y: 3, w: 3, h: 1, c: "brown" },
-  { x: 1, y: 4, w: 1, h: 1, c: "outline" },
-  { x: 5, y: 4, w: 1, h: 1, c: "outline" },
-  { x: 1, y: 5, w: 5, h: 3, c: "brown" },
-  { x: 1, y: 5, w: 1, h: 3, c: "outline" },
-  { x: 5, y: 5, w: 1, h: 3, c: "outline" },
-  { x: 1, y: 5, w: 5, h: 1, c: "red" },
-  { x: 2, y: 6, w: 3, h: 1, c: "white" },
-  { x: 0, y: 8, w: 7, h: 2, c: "brown" },
-  { x: 0, y: 8, w: 1, h: 2, c: "outline" },
-  { x: 6, y: 8, w: 1, h: 2, c: "outline" },
+  { x: 2, y: 0, w: 3, h: 2, c: "red" },
+  { x: 2, y: 2, w: 3, h: 2, c: "brown" },
+  { x: 0, y: 4, w: 7, h: 5, c: "brown" },
+  { x: 0, y: 4, w: 7, h: 1, c: "red" },
+  { x: 0, y: 7, w: 7, h: 1, c: "white" },
   { x: 0, y: 9, w: 7, h: 1, c: "outline" },
 ];
 const COKE_W = 7, COKE_H = 10;
@@ -76,68 +69,73 @@ function ghostBody(bodyColor) {
     { x: 12, y: 9, w: 2, h: 1, c: bodyColor },
   ];
 }
+// ojos sueltos (se reutilizan para el estado "asustado" y para los
+// ojitos que regresan a casa cuando comen a un fantasma)
 const eyes = [
-  { x: 3, y: 5, w: 3, h: 4, c: "white" },
-  { x: 8, y: 5, w: 3, h: 4, c: "white" },
-  { x: 4, y: 7, w: 1, h: 2, c: "ink" },
-  { x: 9, y: 7, w: 1, h: 2, c: "ink" },
+  { x: 4, y: 5, w: 2, h: 3, c: "ink" },
+  { x: 8, y: 5, w: 2, h: 3, c: "ink" },
+  { x: 4, y: 5, w: 1, h: 1, c: "white" },
+  { x: 8, y: 5, w: 1, h: 1, c: "white" },
 ];
-const cheeks = [
-  { x: 0, y: 8, w: 2, h: 1, c: "pink" },
-  { x: 12, y: 8, w: 2, h: 1, c: "pink" },
-];
-const mouth = [{ x: 6, y: 8, w: 2, h: 1, c: "outline" }];
 
-// Chiikawa: blanco, orejitas pequeñas y redondas, mejillas rosas
+// cara "kawaii" compartida: ojitos redondos y oscuros, sonrisa
+// suave y mejillas grandes — igual para los 3 personajes, así se
+// nota que son familia, y solo cambian orejas + color de cuerpo
+function kawaiiFace() {
+  return [
+    ...eyes,
+    // mejillas grandes y redondas
+    { x: 1, y: 7, w: 3, h: 2, c: "pink" },
+    { x: 10, y: 7, w: 3, h: 2, c: "pink" },
+    // sonrisa pequeña
+    { x: 6, y: 8, w: 1, h: 1, c: "outline" },
+    { x: 7, y: 8, w: 1, h: 1, c: "outline" },
+  ];
+}
+
+// 1) Gato: cuerpo blanco, orejas triangulares con un moño azul
+// en la izquierda
 const CHIIKAWA = [
-  { x: 2, y: -2, w: 2, h: 1, c: "white" },
-  { x: 10, y: -2, w: 2, h: 1, c: "white" },
+  // oreja izquierda (con moño)
+  { x: 2, y: -3, w: 2, h: 1, c: "white" },
+  { x: 1, y: -2, w: 3, h: 1, c: "white" },
   { x: 1, y: -1, w: 4, h: 1, c: "white" },
-  { x: 9, y: -1, w: 4, h: 1, c: "white" },
   { x: 1, y: -1, w: 1, h: 1, c: "outline" },
+  { x: 4, y: -1, w: 1, h: 1, c: "outline" },
+  // oreja derecha
+  { x: 10, y: -3, w: 2, h: 1, c: "white" },
+  { x: 10, y: -2, w: 3, h: 1, c: "white" },
+  { x: 9, y: -1, w: 4, h: 1, c: "white" },
+  { x: 9, y: -1, w: 1, h: 1, c: "outline" },
   { x: 12, y: -1, w: 1, h: 1, c: "outline" },
   ...ghostBody("white"),
-  ...cheeks,
-  ...eyes,
-  ...mouth,
+  ...kawaiiFace(),
+  // moño celeste en la base de la oreja izquierda
+  { x: 0, y: -1, w: 1, h: 1, c: "blue" },
+  { x: 1, y: -2, w: 1, h: 1, c: "blueD" },
+  { x: 2, y: -1, w: 1, h: 1, c: "blue" },
 ];
 
-// Usagi: crema, orejas largas de conejo con interior rosa, mejillas
+// 2) Conejo: cuerpo amarillo pastel, orejas largas con interior rosa
 const USAGI = [
-  { x: 3, y: -7, w: 2, h: 1, c: "cream" },
-  { x: 9, y: -7, w: 2, h: 1, c: "cream" },
-  { x: 3, y: -6, w: 2, h: 5, c: "cream" },
-  { x: 9, y: -6, w: 2, h: 5, c: "cream" },
+  { x: 3, y: -7, w: 2, h: 1, c: "yellow" },
+  { x: 9, y: -7, w: 2, h: 1, c: "yellow" },
+  { x: 3, y: -6, w: 2, h: 5, c: "yellow" },
+  { x: 9, y: -6, w: 2, h: 5, c: "yellow" },
   { x: 3, y: -5, w: 1, h: 3, c: "pink" },
   { x: 10, y: -5, w: 1, h: 3, c: "pink" },
-  { x: 2, y: -1, w: 10, h: 1, c: "cream" },
-  ...ghostBody("cream"),
-  ...cheeks,
-  ...eyes,
-  ...mouth,
+  { x: 2, y: -1, w: 10, h: 1, c: "yellow" },
+  ...ghostBody("yellow"),
+  ...kawaiiFace(),
 ];
 
-// Hachiware: blanco con orejas/corona celeste de doble pico y una
-// mancha celeste asimétrica (el "split" que le da su nombre)
+// 3) Oso: cuerpo blanco, orejas redondas y sencillas, sin adornos
 const HACHIWARE = [
-  { x: 6, y: -6, w: 1, h: 1, c: "blueD" },
-  { x: 3, y: -5, w: 2, h: 1, c: "blue" },
-  { x: 9, y: -5, w: 2, h: 1, c: "blue" },
-  { x: 2, y: -4, w: 3, h: 1, c: "blue" },
-  { x: 9, y: -4, w: 3, h: 1, c: "blue" },
-  { x: 2, y: -3, w: 4, h: 1, c: "blue" },
-  { x: 8, y: -3, w: 4, h: 1, c: "blue" },
-  { x: 1, y: -2, w: 5, h: 1, c: "blue" },
-  { x: 8, y: -2, w: 5, h: 1, c: "blue" },
-  { x: 3, y: -2, w: 2, h: 1, c: "blueD" },
-  { x: 9, y: -2, w: 2, h: 1, c: "blueD" },
-  { x: 1, y: -1, w: 12, h: 1, c: "blue" },
-  { x: 5, y: -1, w: 4, h: 1, c: "blueD" },
+  { x: 1, y: -2, w: 3, h: 2, c: "white" },
+  { x: 10, y: -2, w: 3, h: 2, c: "white" },
+  { x: 2, y: -1, w: 10, h: 1, c: "white" },
   ...ghostBody("white"),
-  { x: 9, y: 9, w: 2, h: 1, c: "blue" }, // mancha asimétrica característica
-  ...cheeks,
-  ...eyes,
-  ...mouth,
+  ...kawaiiFace(),
 ];
 
 const GHOST_W = 14, GHOST_H = 10, GHOST_YOFF = 7; // reservar espacio para orejas arriba

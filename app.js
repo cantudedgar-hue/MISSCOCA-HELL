@@ -79,6 +79,32 @@ function isWalkable(grid, r, c) {
   return grid[r][c] !== "#";
 }
 
+// mapa de distancias (BFS) desde un punto fijo del laberinto — se usa
+// para que los fantasmas comidos siempre encuentren el camino de
+// regreso a la casa, sin quedarse atascados rebotando entre paredes
+function buildDistanceMap(grid, target) {
+  const dist = Array.from({ length: ROWS }, () => new Array(COLS).fill(Infinity));
+  dist[target.r][target.c] = 0;
+  const queue = [[target.r, target.c]];
+  let head = 0;
+  while (head < queue.length) {
+    const [r, c] = queue[head++];
+    const d = dist[r][c];
+    for (const k of DIR_KEYS) {
+      const m = DIRS[k];
+      const nr = r + m.dr;
+      const nc = nr < 0 || nr >= ROWS ? c : (c + m.dc + COLS) % COLS;
+      if (nr < 0 || nr >= ROWS) continue;
+      if (grid[nr][nc] === "#") continue;
+      if (dist[nr][nc] > d + 1) {
+        dist[nr][nc] = d + 1;
+        queue.push([nr, nc]);
+      }
+    }
+  }
+  return dist;
+}
+
 const DIRS = {
   up: { dr: -1, dc: 0 },
   down: { dr: 1, dc: 0 },
@@ -88,7 +114,7 @@ const DIRS = {
 const OPPOSITE = { up: "down", down: "up", left: "right", right: "left" };
 const DIR_KEYS = Object.keys(DIRS);
 
-const TILE = 22;
+const TILE = 30;
 const SPEED_PLAYER = 5.3;      // celdas por segundo
 const SPEED_GHOST = 4.4;
 const SPEED_GHOST_FRIGHT = 2.7;
@@ -148,6 +174,7 @@ function PacmanGame() {
     stateRef.current = {
       grid,
       dotsLeft,
+      homeDist: buildDistanceMap(grid, GHOST_HOME),
       score: 0,
       lives: 3,
       player: { r: PLAYER_START.r, c: PLAYER_START.c, dir: null, facing: "left", want: "left", progress: 0 },
@@ -204,13 +231,19 @@ function PacmanGame() {
     if (s.dotsLeft <= 0) s.status = "won";
   };
 
+  const visualPos = (e) => {
+    if (!e.dir) return { vr: e.r, vc: e.c };
+    const m = DIRS[e.dir];
+    return { vr: e.r + m.dr * e.progress, vc: e.c + m.dc * e.progress };
+  };
+
   const resolveCollisions = (s) => {
     const p = s.player;
+    const pv = visualPos(p);
     for (const g of s.ghosts) {
       if (!g.alive) continue;
-      const dr = g.r - p.r, dc = g.c - p.c;
-      if (Math.abs(dr) + Math.abs(dc) > 1) continue; // filtro rapido
-      const dist = Math.hypot(dr, dc);
+      const gv = visualPos(g);
+      const dist = Math.hypot(gv.vr - pv.vr, gv.vc - pv.vc);
       if (dist < 0.6) {
         const isFright = Date.now() < g.frightUntil;
         if (isFright) {
@@ -243,7 +276,16 @@ function PacmanGame() {
         g.alive = true;
         g.frightUntil = 0;
       }
-      return pickChase(pool, g, GHOST_HOME, false);
+      // usa el mapa de distancias BFS: siempre progresa hacia la casa,
+      // nunca se queda rebotando entre paredes
+      let best = pool[0], bestD = Infinity;
+      for (const d of pool) {
+        const m = DIRS[d];
+        const nr = g.r + m.dr, nc = wrapCol(g.c + m.dc);
+        const dd = s.homeDist[nr][nc];
+        if (dd < bestD) { bestD = dd; best = d; }
+      }
+      return best;
     }
     const noReverse = DIR_KEYS.filter((d) =>
       d !== OPPOSITE[g.facing] && isWalkable(s.grid, g.r + DIRS[d].dr, wrapCol(g.c + DIRS[d].dc))
@@ -358,7 +400,7 @@ function PacmanGame() {
           }
         }
         // comida: cocas pequenas; pastillas de poder: solo un punto blanco
-        const dotPx = Math.max(2, Math.floor(TILE / 8));
+        const dotPx = Math.max(3, Math.floor(TILE / 7));
         const pulse = 0.75 + 0.25 * Math.sin(Date.now() / 180);
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
@@ -381,10 +423,19 @@ function PacmanGame() {
           }
         }
         // fantasmas
-        const ghostPx = (TILE / GHOST_W) * 1.05;
+        const ghostPx = (TILE / GHOST_W) * 1.55;
         s.ghosts.forEach((g) => {
-          if (!g.alive) return;
           const { vr, vc } = visPos(g);
+          if (!g.alive) {
+            // ojos regresando a casa tras ser comidos
+            drawSprite(
+              ctx, eyes,
+              vc * TILE + (TILE - GHOST_W * ghostPx) / 2,
+              vr * TILE + (TILE - GHOST_W * ghostPx) / 2,
+              ghostPx * 0.85
+            );
+            return;
+          }
           const isFright = Date.now() < g.frightUntil;
           ctx.save();
           if (isFright) ctx.globalAlpha = 0.7;
