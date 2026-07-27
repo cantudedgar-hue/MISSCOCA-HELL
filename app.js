@@ -140,7 +140,7 @@ function AvatarView() {
     h(
       "p",
       { className: "avatar-caption" },
-      "Retrato pixel art estilizado — audifonos, lentes, playera gris y pose selfie, hecho a mano con bloques de pixel art (no es una reproduccion fotografica)."
+      "texto generico"
     )
   );
 }
@@ -535,7 +535,7 @@ function App() {
       "header",
       { className: "app-header" },
       h("h1", null, "COCA · PAC"),
-      h("p", { className: "subtitle" }, "avatar pixel art + pac-man con fantasmas de chiikawa")
+      h("p", { className: "subtitle" }, "juego de react novato 2")
     ),
     h(
       "nav",
@@ -544,7 +544,7 @@ function App() {
       h("button", { className: "tab" + (tab === "avatar" ? " active" : ""), onClick: () => setTab("avatar") }, "🎨 Avatar")
     ),
     h("main", null, tab === "juego" ? h(PacmanGame) : h(AvatarView)),
-    h("footer", { className: "app-footer" }, "hecho con React · listo para GitHub Pages")
+    h("footer", { className: "app-footer" }, "miautastico")
   );
 }
 
