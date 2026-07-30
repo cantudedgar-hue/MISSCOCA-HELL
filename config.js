@@ -51,11 +51,11 @@ const CONFIG = {
   // ruta a un .mp3/.wav/.ogg, ej "assets/sfx/comer.mp3".
   // deja "" (vacio) para que esa accion no suene nada.
   sounds: {
-    eatDot: "/assets/sfx/hachiware-oi_FYOX2Q7.mp3",
-    eatPower: "/assets/sfx/chiikawa-car-honk.mp3",
-    eatGhost: "/assets/sfx/eat-ghost.mp3",
-    death: "/assets/sfx/chiikawa-usagi-huh.mp3",
-    win: "/assets/sfx/win.mp3",
+    eatDot: "assets/sfx/hachiware-oi_FYOX2Q7.mp3",
+    eatPower: "assets/sfx/chiikawa-car-honk.mp3",
+    eatGhost: "assets/sfx/eat-ghost.mp3",
+    death: "assets/sfx/chiikawa-usagi-huh.mp3",
+    win: "assets/sfx/win.mp3",
   },
   soundVolume: 0.5, // 0.0 (mudo) a 1.0 (full)
 
