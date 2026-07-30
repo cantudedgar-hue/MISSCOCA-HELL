@@ -98,15 +98,12 @@ function kawaiiFace() {
 // vez aqui y se dibujan con ctx.drawImage() en app.js. El navegador
 // las muestra "pixeladas" gracias a ctx.imageSmoothingEnabled=false
 // (ver draw() en app.js) y a image-rendering:pixelated en el CSS. ----------
-const ENEMY_SRC = {
-  hachiware: "assets/enemy-hachiware.png",
-  chiikawa: "assets/enemy-chiikawa.png",
-  usagi: "assets/enemy-usagi.png",
-};
+// las rutas viven en config.js (CONFIG.enemyImages) — cambia ahi,
+// no aqui, si quieres poner tus propios PNG
 const ENEMY_IMAGES = {};
-for (const key in ENEMY_SRC) {
+for (const key in CONFIG.enemyImages) {
   const img = new Image();
-  img.src = ENEMY_SRC[key];
+  img.src = CONFIG.enemyImages[key];
   ENEMY_IMAGES[key] = img;
 }
 

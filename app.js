@@ -2,60 +2,52 @@ const h = React.createElement;
 const { useState, useEffect, useRef, useCallback } = React;
 
 // ============================================================
-// MAZE — 19x21, generado y validado con espejado simetrico
-// (horizontal y vertical) para una mejor distribucion del mapa.
+// NIVELES — los mazes viven en config.js (CONFIG.levels), no aqui.
+// Cada nivel trae su propio maze, pastillas de poder, y posicion
+// inicial del jugador y de los fantasmas. Para agregar los tuyos,
+// edita CONFIG.levels en config.js (ahi esta el formato explicado).
 // # pared . coca (comida) o pastilla de poder (punto blanco)
 // espacio = camino libre sin comida (casa de fantasmas)
 // ============================================================
-const RAW_MAZE = [
-  "###################",
-  "#.................#",
-  "#.##.##.###.##.##.#",
-  "#.#.....###.....#.#",
-  "#.#.##.#####.##.#.#",
-  "#.................#",
-  "#.###.#######.###.#",
-  "#...#.#######.#...#",
-  "#.#.#..     ..#.#.#",
-  "#.#.#####.#####.#.#",
-  "#.####.     .####.#",
-  "#.#.#####.#####.#.#",
-  "#.#.#..     ..#.#.#",
-  "#...#.#######.#...#",
-  "#.###.#######.###.#",
-  "#.................#",
-  "#.#.##.#####.##.#.#",
-  "#.#.....###.....#.#",
-  "#.##.##.###.##.##.#",
-  "#.................#",
-  "###################",
-];
-// pastillas de poder en las 4 esquinas del recorrido exterior
-const POWER_SPOTS = [
-  [1, 1], [1, 17], [19, 1], [19, 17],
-];
-const MAZE_ROWS = RAW_MAZE.map((row, r) => {
-  const spots = POWER_SPOTS.filter(([pr]) => pr === r).map(([, pc]) => pc);
-  if (!spots.length) return row;
-  const chars = row.split("");
-  spots.forEach((c) => { chars[c] = "o"; });
-  return chars.join("");
-});
 
-const ROWS = MAZE_ROWS.length;
-const COLS = MAZE_ROWS[0].length;
-const PLAYER_START = { r: 15, c: 9 };
-const GHOST_HOME = { r: 10, c: 9 };
-const GHOST_START = [
-  { r: 10, c: 8 },
-  { r: 10, c: 9 },
-  { r: 10, c: 10 },
-];
+// datos del nivel actualmente cargado — se recalculan cada vez que
+// se llama loadLevelDef(), por eso son "let" y no "const"
+let MAZE_ROWS = [];
+let ROWS = 0;
+let COLS = 0;
+let PLAYER_START = { r: 0, c: 0 };
+let GHOST_HOME = { r: 0, c: 0 };
+let GHOST_START = [];
+
 const GHOST_DEFS = [
   { name: "Hachiware", img: ENEMY_IMAGES.hachiware },
   { name: "Chiikawa", img: ENEMY_IMAGES.chiikawa },
   { name: "Usagi", img: ENEMY_IMAGES.usagi },
 ];
+
+// estampa las pastillas de poder (powerSpots del nivel) sobre el maze
+function applyPowerSpots(rawMaze, powerSpots) {
+  return rawMaze.map((row, r) => {
+    const spots = (powerSpots || []).filter(([pr]) => pr === r).map(([, pc]) => pc);
+    if (!spots.length) return row;
+    const chars = row.split("");
+    spots.forEach((c) => { chars[c] = "o"; });
+    return chars.join("");
+  });
+}
+
+// carga el nivel CONFIG.levels[index]: actualiza MAZE_ROWS/ROWS/COLS/
+// PLAYER_START/GHOST_HOME/GHOST_START y regresa {grid, dotsLeft}
+function loadLevelDef(index) {
+  const def = CONFIG.levels[index];
+  MAZE_ROWS = applyPowerSpots(def.maze, def.powerSpots);
+  ROWS = MAZE_ROWS.length;
+  COLS = MAZE_ROWS[0].length;
+  PLAYER_START = def.playerStart;
+  GHOST_HOME = def.ghostHome;
+  GHOST_START = def.ghostStart;
+  return parseMaze();
+}
 
 function parseMaze() {
   const grid = [];
@@ -115,11 +107,12 @@ const OPPOSITE = { up: "down", down: "up", left: "right", right: "left" };
 const DIR_KEYS = Object.keys(DIRS);
 
 const TILE = 30;
-const SPEED_PLAYER = 5.3;      // celdas por segundo
-const SPEED_GHOST = 4.4;
-const SPEED_GHOST_FRIGHT = 2.7;
-const SPEED_GHOST_EATEN = 7.5;
-const FRIGHT_MS = 7000;
+// velocidades y duracion del modo vulnerable: definidas en config.js
+const SPEED_PLAYER = CONFIG.speedPlayer;
+const SPEED_GHOST = CONFIG.speedGhost;
+const SPEED_GHOST_FRIGHT = CONFIG.speedGhostFright;
+const SPEED_GHOST_EATEN = CONFIG.speedGhostEaten;
+const FRIGHT_MS = CONFIG.frightMs;
 
 function AvatarView() {
   const canvasRef = useRef(null);
@@ -140,7 +133,7 @@ function AvatarView() {
     h(
       "p",
       { className: "avatar-caption" },
-      "texto generico"
+      CONFIG.texts.avatarCaption
     )
   );
 }
@@ -167,16 +160,45 @@ function pickChase(pool, from, target, away) {
 function PacmanGame() {
   const canvasRef = useRef(null);
   const stateRef = useRef(null);
-  const [ui, setUi] = useState({ score: 0, lives: 3, status: "ready" }); // ready | playing | won | lost
+  const musicRef = useRef(null);
+  const [muted, setMuted] = useState(false);
+  const [ui, setUi] = useState({ score: 0, lives: 3, status: "ready", level: 1, levelCount: CONFIG.levels.length }); // ready | playing | levelComplete | won | lost
+
+  // musica de fondo (CONFIG.music.src) — arranca en loop y se queda
+  // sonando durante todo el juego, entre niveles y todo. Si el
+  // navegador bloquea el autoplay, arranca en cuanto el usuario
+  // toca una tecla o la pantalla (requisito de los navegadores).
+  useEffect(() => {
+    if (!CONFIG.music.src) return;
+    const audio = new Audio(CONFIG.music.src);
+    audio.loop = CONFIG.music.loop;
+    audio.volume = CONFIG.music.volume;
+    musicRef.current = audio;
+    const tryPlay = () => audio.play().catch(() => {});
+    tryPlay();
+    window.addEventListener("keydown", tryPlay, { once: true });
+    window.addEventListener("pointerdown", tryPlay, { once: true });
+    return () => {
+      window.removeEventListener("keydown", tryPlay);
+      window.removeEventListener("pointerdown", tryPlay);
+      audio.pause();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (musicRef.current) musicRef.current.muted = muted;
+  }, [muted]);
 
   const initGame = useCallback(() => {
-    const { grid, dotsLeft } = parseMaze();
+    const level = 0;
+    const { grid, dotsLeft } = loadLevelDef(level);
     stateRef.current = {
+      level,
       grid,
       dotsLeft,
       homeDist: buildDistanceMap(grid, GHOST_HOME),
       score: 0,
-      lives: 3,
+      lives: CONFIG.livesStart,
       player: { r: PLAYER_START.r, c: PLAYER_START.c, dir: null, facing: "left", want: "left", progress: 0 },
       ghosts: GHOST_START.map((g, i) => ({
         r: g.r, c: g.c, dir: null, facing: "up", progress: 0,
@@ -187,7 +209,27 @@ function PacmanGame() {
       mouthOpen: true,
       mouthT: 0,
     };
-    setUi({ score: 0, lives: 3, status: "playing" });
+    setUi({ score: 0, lives: CONFIG.livesStart, status: "playing", level: level + 1, levelCount: CONFIG.levels.length });
+  }, []);
+
+  // avanza al siguiente nivel manteniendo puntos y vidas
+  const goNextLevel = useCallback(() => {
+    const s = stateRef.current;
+    if (!s) return;
+    const level = s.level + 1;
+    const { grid, dotsLeft } = loadLevelDef(level);
+    s.level = level;
+    s.grid = grid;
+    s.dotsLeft = dotsLeft;
+    s.homeDist = buildDistanceMap(grid, GHOST_HOME);
+    s.player = { r: PLAYER_START.r, c: PLAYER_START.c, dir: null, facing: "left", want: "left", progress: 0 };
+    s.ghosts = GHOST_START.map((g, i) => ({
+      r: g.r, c: g.c, dir: null, facing: "up", progress: 0,
+      def: GHOST_DEFS[i], alive: true, frightUntil: 0,
+    }));
+    s.frightTimer = 0;
+    s.status = "playing";
+    setUi({ score: s.score, lives: s.lives, status: "playing", level: level + 1, levelCount: CONFIG.levels.length });
   }, []);
 
   useEffect(() => { initGame(); }, [initGame]);
@@ -221,14 +263,20 @@ function PacmanGame() {
       s.grid[r][c] = " ";
       s.score += 10;
       s.dotsLeft--;
+      playSound("eatDot");
     } else if (cell === "o") {
       s.grid[r][c] = " ";
       s.score += 50;
       s.dotsLeft--;
       s.frightTimer = Date.now() + FRIGHT_MS;
       s.ghosts.forEach((g) => { if (g.alive) g.frightUntil = s.frightTimer; });
+      playSound("eatPower");
     }
-    if (s.dotsLeft <= 0) s.status = "won";
+    if (s.dotsLeft <= 0) {
+      const hasNextLevel = s.level < CONFIG.levels.length - 1;
+      s.status = hasNextLevel ? "levelComplete" : "won";
+      playSound("win");
+    }
   };
 
   const visualPos = (e) => {
@@ -250,8 +298,10 @@ function PacmanGame() {
           g.alive = false;
           g.frightUntil = 0;
           s.score += 200;
+          playSound("eatGhost");
         } else {
           s.lives -= 1;
+          playSound("death");
           if (s.lives <= 0) {
             s.status = "lost";
           } else {
@@ -360,7 +410,7 @@ function PacmanGame() {
         uiAccum += dt;
         if (uiAccum > 0.12) {
           uiAccum = 0;
-          setUi({ score: s.score, lives: s.lives, status: s.status });
+          setUi({ score: s.score, lives: s.lives, status: s.status, level: s.level + 1, levelCount: CONFIG.levels.length });
         }
       }
       raf = requestAnimationFrame(loop);
@@ -374,8 +424,6 @@ function PacmanGame() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    canvas.width = COLS * TILE;
-    canvas.height = ROWS * TILE;
     let raf;
     const visPos = (e) => {
       if (!e.dir) return { vr: e.r, vc: e.c };
@@ -384,6 +432,10 @@ function PacmanGame() {
     };
     const draw = () => {
       const s = stateRef.current;
+      // el tamano del canvas depende del nivel actual (COLS/ROWS
+      // pueden cambiar entre niveles si sus mazes tienen otro tamano)
+      if (canvas.width !== COLS * TILE) canvas.width = COLS * TILE;
+      if (canvas.height !== ROWS * TILE) canvas.height = ROWS * TILE;
       ctx.imageSmoothingEnabled = false;
       ctx.fillStyle = "#0c0d14";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -392,9 +444,9 @@ function PacmanGame() {
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
             if (s.grid[r][c] === "#") {
-              ctx.fillStyle = "#1c3fae";
+              ctx.fillStyle = CONFIG.colors.wallFill;
               ctx.fillRect(c * TILE + 2, r * TILE + 2, TILE - 4, TILE - 4);
-              ctx.fillStyle = "#3a63e8";
+              ctx.fillStyle = CONFIG.colors.wallHighlight;
               ctx.fillRect(c * TILE + 2, r * TILE + 2, TILE - 4, 3);
             }
           }
@@ -494,20 +546,30 @@ function PacmanGame() {
     h(
       "div",
       { className: "hud" },
-      h("div", { className: "hud-item" }, "Puntos: ", h("b", null, ui.score)),
-      h("div", { className: "hud-item" }, "Vidas: ", h("b", null, "🥤".repeat(Math.max(ui.lives, 0)))),
+      h("div", { className: "hud-item" }, CONFIG.texts.scoreLabel, h("b", null, ui.score)),
+      h("div", { className: "hud-item" }, CONFIG.texts.livesLabel, h("b", null, CONFIG.livesIcon.repeat(Math.max(ui.lives, 0)))),
+      CONFIG.levels.length > 1 && h("div", { className: "hud-item" }, CONFIG.texts.levelLabel, h("b", null, ui.level + "/" + ui.levelCount)),
+      CONFIG.music.src && h("button", { className: "tc-btn", onClick: () => setMuted((m) => !m) }, muted ? "🔇" : "🔊"),
     ),
     h(
       "div",
       { className: "canvas-shell" },
       h("canvas", { ref: canvasRef, className: "game-canvas" }),
-      (status === "won" || status === "lost") &&
+      (status === "won" || status === "lost" || status === "levelComplete") &&
         h(
           "div",
           { className: "overlay" },
-          h("p", { className: "overlay-title" }, status === "won" ? "¡Ganaste! 🥤" : "Te atraparon"),
-          h("p", null, "Puntos finales: " + ui.score),
-          h("button", { className: "btn", onClick: initGame }, "Jugar de nuevo")
+          h(
+            "p",
+            { className: "overlay-title" },
+            status === "won" ? CONFIG.texts.wonTitle :
+            status === "levelComplete" ? CONFIG.texts.levelCompleteTitle :
+            CONFIG.texts.lostTitle
+          ),
+          h("p", null, CONFIG.texts.scoreLabel + ui.score),
+          status === "levelComplete"
+            ? h("button", { className: "btn", onClick: goNextLevel }, CONFIG.texts.nextLevelBtn)
+            : h("button", { className: "btn", onClick: initGame }, CONFIG.texts.playAgain)
         )
     ),
     h(
@@ -522,29 +584,34 @@ function PacmanGame() {
         h("button", { className: "tc-btn", onClick: () => setWant("right") }, "▶")
       )
     ),
-    h("p", { className: "hint" }, "Usa las flechas / WASD o los botones. Come todas las cocas evitando a Hachiware, Chiikawa y Usagi — el punto blanco grande los vuelve vulnerables por unos segundos para que tú te los comas.")
+    h("p", { className: "hint" }, CONFIG.texts.hint)
   );
 }
 
 function App() {
   const [tab, setTab] = useState("juego");
+  // aplica CONFIG.colors.accent al borde/glow del canvas y a los
+  // botones tactiles (variable --blue en style.css), sin tocar el CSS
+  useEffect(() => {
+    document.documentElement.style.setProperty("--blue", CONFIG.colors.accent);
+  }, []);
   return h(
     "div",
     { className: "app" },
     h(
       "header",
       { className: "app-header" },
-      h("h1", null, "COCA · PAC"),
-      h("p", { className: "subtitle" }, "juego de react novato 2")
+      h("h1", null, CONFIG.texts.title),
+      h("p", { className: "subtitle" }, CONFIG.texts.subtitle)
     ),
     h(
       "nav",
       { className: "tabs" },
-      h("button", { className: "tab" + (tab === "juego" ? " active" : ""), onClick: () => setTab("juego") }, "🕹 Juego"),
-      h("button", { className: "tab" + (tab === "avatar" ? " active" : ""), onClick: () => setTab("avatar") }, "🎨 Avatar")
+      h("button", { className: "tab" + (tab === "juego" ? " active" : ""), onClick: () => setTab("juego") }, CONFIG.texts.tabGame),
+      h("button", { className: "tab" + (tab === "avatar" ? " active" : ""), onClick: () => setTab("avatar") }, CONFIG.texts.tabAvatar)
     ),
     h("main", null, tab === "juego" ? h(PacmanGame) : h(AvatarView)),
-    h("footer", { className: "app-footer" }, "miautastico")
+    h("footer", { className: "app-footer" }, CONFIG.texts.footer)
   );
 }
 
