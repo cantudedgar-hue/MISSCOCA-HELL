@@ -68,7 +68,7 @@ const CONFIG = {
   // navegador lo bloquea, arranca en cuanto tocas una tecla/pantalla.
   // Hay un boton 🔊/🔇 en el HUD para silenciarla.
   music: {
-    src: "/assets/sfx/uwawa.mp3",
+    src: "assets/sfx/uwawa.mp3",
     volume: 0.35,
     loop: true,
   },
